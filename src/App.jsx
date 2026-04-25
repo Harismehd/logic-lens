@@ -69,16 +69,16 @@ const App = () => {
             setPythonStatus('error');
         });
 
-      const { checkOllamaStatus } = await import('./services/LocalMentorService');
-      const isOnline = await checkOllamaStatus();
+      const { checkMentorStatus } = await import('./services/LocalMentorService');
+      const isOnline = await checkMentorStatus();
       setMentorStatus(isOnline ? 'online' : 'offline');
     };
     init();
 
     // Poll status every 30s
     const interval = setInterval(async () => {
-        const { checkOllamaStatus } = await import('./services/LocalMentorService');
-        const isOnline = await checkOllamaStatus();
+        const { checkMentorStatus } = await import('./services/LocalMentorService');
+        const isOnline = await checkMentorStatus();
         setMentorStatus(isOnline ? 'online' : 'offline');
     }, 30000);
     return () => clearInterval(interval);
@@ -698,7 +698,7 @@ const App = () => {
           <section className="mentor-section">
             <div className="section-header">
               <MessageSquare size={18} />
-              <h2>Local Logic Mentor</h2>
+              <h2>AI Logic Mentor</h2>
               <div className={`status-indicator ${mentorStatus}`} title={`Mentor is ${mentorStatus}`}>
                 {mentorStatus === 'online' ? <Zap size={12} fill="currentColor" /> : <ShieldCheck size={12} />}
                 <span>{mentorStatus.toUpperCase()}</span>
