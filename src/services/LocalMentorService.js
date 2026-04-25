@@ -1,6 +1,6 @@
 /**
  * Logic Lens Mentor Service
- * Powered by Google Gemini 1.5 Flash
+ * Powered by Google Gemini Pro
  */
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -13,7 +13,7 @@ let model = null;
 if (API_KEY) {
     try {
         genAI = new GoogleGenerativeAI(API_KEY);
-        model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        model = genAI.getGenerativeModel({ model: "gemini-pro" });
     } catch (e) {
         console.error("[MentorService] Initialization failed:", e);
     }
