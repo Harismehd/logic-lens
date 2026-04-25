@@ -181,3 +181,7 @@ const getOfflineResponse = (code, query, errors, activePattern) => {
     }
     return "I'm currently focused on helping you fix specific errors. Try running your code to see if it behaves as expected!";
 };
+
+// Backward Compatibility Aliases
+export const checkOllamaStatus = checkMentorStatus;
+export const callOllama = callGemini;
