@@ -62,6 +62,38 @@ export const analyzeSafety = (code) => {
     return issues;
 };
 
+export const instrumentCodeForSafety = (code) => {
+    // 1. Inject safety header
+    const safetyHeader = [
+        "import time",
+        "_start_time = time.time()",
+        "_iter_count = 0",
+        "def _check_safety():",
+        "    global _iter_count",
+        "    _iter_count += 1",
+        "    if _iter_count % 1000 == 0:",
+        "        if time.time() - _start_time > 3:",
+        "            raise Exception('SAFETY_ERROR: Execution timeout (possible infinite loop)')",
+        ""
+    ].join('\n');
+
+    // 2. Inject heartbeat into every loop
+    const lines = code.split('\n');
+    const instrumentedLines = [];
+    
+    for (let line of lines) {
+        instrumentedLines.push(line);
+        const trimmed = line.trim();
+        // Detect loop starts (while/for ending in colon)
+        if ((trimmed.startsWith('while ') || trimmed.startsWith('for ')) && trimmed.endsWith(':')) {
+            const indent = line.match(/^\s*/)[0];
+            instrumentedLines.push(`${indent}    _check_safety()`);
+        }
+    }
+
+    return safetyHeader + instrumentedLines.join('\n');
+};
+
 export const runWithTimeout = async (task, timeoutMs = 5000) => {
     return Promise.race([
         task(),

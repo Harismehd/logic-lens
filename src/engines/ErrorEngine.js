@@ -98,7 +98,24 @@ export const scanPythonCode = (code) => {
         const symbolTable = new Set();
         
         // Add built-ins to symbol table
-        ['print', 'range', 'len', 'sum', 'min', 'max', 'int', 'str', 'float', 'list', 'dict', 'set', 'bool', 'True', 'False', 'None', 'input'].forEach(b => symbolTable.add(b));
+        ['print', 'range', 'len', 'sum', 'min', 'max', 'int', 'str', 'float', 'list', 'dict', 'set', 'bool', 'True', 'False', 'None', 'input', 'enumerate', 'reversed', 'sorted', 'zip', 'any', 'all', 'tuple', 'Exception', 'ValueError', 'IndexError', 'KeyError'].forEach(b => symbolTable.add(b));
+
+        // 0. Prediction: Check for common mistakes before they become errors
+        const lines = code.split('\n');
+        lines.forEach((line, idx) => {
+            const trimmed = line.trim();
+            // Predict missing == in if/while
+            if ((trimmed.startsWith('if ') || trimmed.startsWith('while ')) && trimmed.includes('=') && !trimmed.includes('==') && !trimmed.includes('!=') && !trimmed.includes('>=') && !trimmed.includes('<=') && !trimmed.includes(' in ')) {
+                errors.push({
+                    line: idx + 1,
+                    column: line.indexOf('=') + 1,
+                    type: ERROR_TYPES.WARNING,
+                    message: "Potential assignment in condition. Did you mean '=='?",
+                    prediction: true,
+                    hint: "Use '==' to compare values, '=' to assign values."
+                });
+            }
+        });
 
         walkTree(tree.rootNode, errors, symbolTable, code);
         
@@ -106,6 +123,20 @@ export const scanPythonCode = (code) => {
     } catch (e) {
         console.error("Scanning error:", e);
         return [];
+    }
+};
+
+/**
+ * Helper to add all identifiers found within a node to the symbol table
+ */
+const addIdentifiersToSymbolTable = (node, symbolTable, code) => {
+    if (!node) return;
+    if (node.type === 'identifier') {
+        symbolTable.add(code.substring(node.startIndex, node.endIndex));
+    } else {
+        for (let i = 0; i < node.childCount; i++) {
+            addIdentifiersToSymbolTable(node.child(i), symbolTable, code);
+        }
     }
 };
 
@@ -135,6 +166,13 @@ const walkTree = (node, errors, symbolTable, code, depth = 0) => {
             hint = "Ensure your quotes match: '...' or \"...\"";
         }
 
+        // Check for missing colon after block starters if not already caught
+        const parentText = node.parent ? code.substring(node.parent.startIndex, node.parent.endIndex) : "";
+        if (parentText.match(/^(if|for|while|def|class|elif|else|try|except)/) && !parentText.includes(':')) {
+             message = "Missing colon (:) at the end of the statement.";
+             type = ERROR_TYPES.MISSING_COLON;
+        }
+
         errors.push({
             line: start.row + 1,
             column: start.column + 1,
@@ -149,17 +187,7 @@ const walkTree = (node, errors, symbolTable, code, depth = 0) => {
     // 2. Scope Tracking (Identifiers)
     if (node.type === 'assignment') {
         const left = node.childForFieldName('left');
-        if (left && left.type === 'identifier') {
-            symbolTable.add(code.substring(left.startIndex, left.endIndex));
-        } else if (left && left.type === 'pattern_list') {
-             // Handle list unpacking: x, y = 1, 2
-             for (let i = 0; i < left.childCount; i++) {
-                 const child = left.child(i);
-                 if (child.type === 'identifier') {
-                     symbolTable.add(code.substring(child.startIndex, child.endIndex));
-                 }
-             }
-        }
+        addIdentifiersToSymbolTable(left, symbolTable, code);
     }
 
     if (node.type === 'function_definition') {
@@ -186,9 +214,7 @@ const walkTree = (node, errors, symbolTable, code, depth = 0) => {
 
     if (node.type === 'for_statement') {
         const leftNode = node.childForFieldName('left');
-        if (leftNode && leftNode.type === 'identifier') {
-            symbolTable.add(code.substring(leftNode.startIndex, leftNode.endIndex));
-        }
+        addIdentifiersToSymbolTable(leftNode, symbolTable, code);
     }
 
     // 3. Name Error Detection (Undefined Variables)
@@ -213,14 +239,6 @@ const walkTree = (node, errors, symbolTable, code, depth = 0) => {
                     hint: `You used '${name}' but never assigned it a value. Did you mean one of these: ${Array.from(symbolTable).slice(-5).join(', ')}?`
                 });
             }
-        }
-    }
-
-    // 4. Specific Pythonic traps (like s=a'v)
-    if (node.type === 'expression_statement' && node.childCount > 0) {
-        const firstChild = node.child(0);
-        if (firstChild.type === 'string' && !firstChild.text.endsWith("'") && !firstChild.text.endsWith('"')) {
-             // Catch incomplete strings that tree-sitter might treat as something else
         }
     }
 

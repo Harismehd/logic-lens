@@ -7,11 +7,15 @@ import { getLocalMentorResponse } from './services/LocalMentorService';
 import { compareLogic } from './services/ComparisonEngine';
 import { executePython, runWithTimeout as runPythonWithTimeout } from './services/RealCompilerService';
 import { scanPythonCode, COLOR_MAP, ERROR_TYPES } from './engines/ErrorEngine';
-import { Terminal, Send, Lightbulb, AlertCircle, CheckCircle, Flame, Play, MessageSquare, History, Sparkles, Zap, ShieldCheck } from 'lucide-react';
+import { Terminal, Send, Lightbulb, AlertCircle, CheckCircle, Flame, Play, MessageSquare, History, Sparkles, Zap, ShieldCheck, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Confetti from 'react-confetti';
 import { analyzeSafety, runWithTimeout } from './engines/SafetyEngine';
 import { getErrorVariants, getRefactorSuggestions } from './engines/AdvancedPedagogy';
+import EnhancedErrorCard from './components/EnhancedErrorCard';
+import MasteryTracker from './components/MasteryTracker';
+import { generateLayeredHint, trackErrorPattern } from './engines/HintEngine';
+import { getMastery, updateMastery } from './services/MasteryEngine';
 
 const App = () => {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -33,6 +37,7 @@ const App = () => {
   const [explainLine, setExplainLine] = useState("");
   const [explainAnswer, setExplainAnswer] = useState("");
   const [mentorQuestion, setMentorQuestion] = useState("");
+  const [verificationFeedback, setVerificationFeedback] = useState("");
   
   // Pedagogy & Safety
   const [safetyWarnings, setSafetyWarnings] = useState([]);
@@ -43,7 +48,6 @@ const App = () => {
   const sparkTimerRef = useRef(null);
   const autoRunTimerRef = useRef(null);
   const [inputHistory, setInputHistory] = useState([]);
-  const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [currentInputPrompt, setCurrentInputPrompt] = useState("");
   const [tempInputValue, setTempInputValue] = useState("");
 
@@ -51,7 +55,16 @@ const App = () => {
   const [mentorStatus, setMentorStatus] = useState('checking');
   const [pythonStatus, setPythonStatus] = useState('loading');
   const [isExecuting, setIsExecuting] = useState(false);
+  const [intensiveMode, setIntensiveMode] = useState(null);
+  const [masteryData, setMasteryData] = useState(getMastery());
+  const [masteryNotice, setMasteryNotice] = useState(null); // For toast notifications
+  const [errorGenealogy, setErrorGenealogy] = useState([]);
+  const [awaitingInput, setAwaitingInput] = useState(false);
+  const prevErrorCount = useRef(0);
 
+  const [pyrightStatus, setPyrightStatus] = useState('loading');
+  const [pyrightDiagnostics, setPyrightDiagnostics] = useState([]);
+  const [quickFixes, setQuickFixes] = useState([]);
   const editorRef = useRef(null);
 
   // 0. Initialize ErrorEngine & Mentor Status
@@ -72,6 +85,18 @@ const App = () => {
       const { checkMentorStatus } = await import('./services/LocalMentorService');
       const isOnline = await checkMentorStatus();
       setMentorStatus(isOnline ? 'online' : 'offline');
+
+      // Check Pyright
+      try {
+        const resp = await fetch('http://localhost:5000/analyze', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ code: '# init' })
+        });
+        if (resp.ok) setPyrightStatus('ready');
+      } catch (e) {
+        setPyrightStatus('offline');
+      }
     };
     init();
 
@@ -83,6 +108,68 @@ const App = () => {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Periodic Mastery Sync
+  useEffect(() => {
+    const sync = () => {
+        const current = getMastery();
+        setMasteryData(current);
+    };
+    const interval = setInterval(sync, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Pyright Real-time Analysis
+  useEffect(() => {
+    if (!code) return;
+    
+    const analyze = async () => {
+        try {
+            const resp = await fetch('http://localhost:5000/analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ code })
+            });
+            const data = await resp.json();
+            setPyrightDiagnostics(data.diagnostics || []);
+            
+            // Generate Quick Fixes from diagnostics
+            const fixes = (data.diagnostics || []).filter(d => d.severity === 'error').map(d => {
+                if (d.message.includes("is not defined")) {
+                    return { label: `Define ${d.message.split("'")[1]}`, action: 'define' };
+                }
+                if (d.message.includes("Expected '=='")) {
+                    return { label: 'Use == for comparison', action: 'fix_eq' };
+                }
+                return null;
+            }).filter(Boolean);
+            setQuickFixes(fixes.slice(0, 3));
+            
+        } catch (e) {
+            console.error("[Pyright] Analysis failed:", e);
+        }
+    };
+
+    const timer = setTimeout(analyze, 300);
+    return () => clearTimeout(timer);
+  }, [code]);
+
+  // 2. Pyright Real-time Markers
+  useEffect(() => {
+    if (editorRef.current && window.monaco) {
+        const monaco = window.monaco;
+        const model = editorRef.current.getModel();
+        const markers = pyrightDiagnostics.map(d => ({
+            startLineNumber: d.line,
+            startColumn: d.col,
+            endLineNumber: d.line,
+            endColumn: d.col + 5,
+            message: d.message,
+            severity: d.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning
+        }));
+        monaco.editor.setModelMarkers(model, 'pyright', markers);
+    }
+  }, [pyrightDiagnostics]);
 
   const handleAskMentor = async (e) => {
     if (e) e.preventDefault();
@@ -99,6 +186,101 @@ const App = () => {
     setMentorQuestion("");
   };
 
+  const handleEditorMount = (editor, monaco) => {
+    editorRef.current = editor;
+    
+    // 1. Register Completion Provider
+    monaco.languages.registerCompletionItemProvider('python', {
+        provideCompletionItems: async (model, position) => {
+            try {
+                const word = model.getWordUntilPosition(position);
+                const range = {
+                    startLineNumber: position.lineNumber,
+                    endLineNumber: position.lineNumber,
+                    startColumn: word.startColumn,
+                    endColumn: word.endColumn
+                };
+
+                const resp = await fetch('http://localhost:5000/complete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        code: model.getValue(), 
+                        line: position.lineNumber, 
+                        col: position.column - 1 
+                    })
+                });
+                const data = await resp.json();
+                
+                return {
+                    suggestions: (data.suggestions || []).map(s => ({
+                        label: s.label,
+                        kind: (s.kind && s.kind > 0) ? s.kind - 1 : monaco.languages.CompletionItemKind.Function,
+                        documentation: s.documentation,
+                        insertText: s.insertText,
+                        detail: s.detail,
+                        range: range
+                    }))
+                };
+            } catch (e) {
+                return { suggestions: [] };
+            }
+        }
+    });
+
+    // 2. Register Hover Provider
+    monaco.languages.registerHoverProvider('python', {
+        provideHover: async (model, position) => {
+            try {
+                const resp = await fetch('http://localhost:5000/hover', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        code: model.getValue(),
+                        line: position.lineNumber, 
+                        col: position.column - 1 
+                    })
+                });
+                const data = await resp.json();
+                if (!data.hover) return null;
+                return {
+                    contents: [
+                        { value: data.hover.contents.value || data.hover.contents[0]?.value || "" }
+                    ]
+                };
+            } catch (e) {
+                return null;
+            }
+        }
+    });
+
+    // 3. Register Signature Help Provider
+    monaco.languages.registerSignatureHelpProvider('python', {
+        signatureHelpTriggerCharacters: ['(', ','],
+        provideSignatureHelp: async (model, position) => {
+            try {
+                const resp = await fetch('http://localhost:5000/signature', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        code: model.getValue(),
+                        line: position.lineNumber, 
+                        col: position.column - 1 
+                    })
+                });
+                const data = await resp.json();
+                if (!data.signatureHelp || !data.signatureHelp.signatures) return null;
+                return {
+                    value: data.signatureHelp,
+                    dispose: () => {}
+                };
+            } catch (e) {
+                return null;
+            }
+        }
+    });
+  };
+
   const handleExplainSubmit = async () => {
     const { verifyExplanation } = await import('./services/LocalMentorService');
     setMentorChat(prev => [...prev, { id: `verify-${Date.now()}`, q: `Explanation for: ${explainLine}`, a: "Verifying your understanding..." }]);
@@ -107,10 +289,11 @@ const App = () => {
     
     if (verification.isCorrect) {
         setIsExplaining(false);
+        setVerificationFeedback("");
         handleSuccess();
         setMentorChat(prev => [...prev, { id: `success-${Date.now()}`, q: "System", a: verification.feedback }]);
     } else {
-        alert(verification.feedback);
+        setVerificationFeedback(verification.feedback);
         setMentorChat(prev => [...prev, { id: `fail-${Date.now()}`, q: "System", a: verification.feedback }]);
     }
   };
@@ -121,12 +304,21 @@ const App = () => {
     
     const newVal = tempInputValue;
     setTempInputValue("");
-    setIsInputModalOpen(false);
+    
+    // Award XP for interaction
+    handleUpdateMastery('data_types', false);
+    console.log("[Mastery] XP awarded for input submission:", updated.xp);
     
     // Add to history and re-run
     const newHistory = [...inputHistory, newVal];
     setInputHistory(newHistory);
     runCode(newHistory); 
+  };
+
+  const handleClearConsole = () => {
+    setConsoleLogs([]);
+    setAwaitingInput(false);
+    setInputHistory([]);
   };
 
   const triggerMutationChallenge = async () => {
@@ -158,6 +350,7 @@ const App = () => {
 
   // 2. Typing Speed Monitor
   const charCountRef = useRef(0);
+  const totalCharsTypedRef = useRef(0); // For milestone XP
   const startTimeRef = useRef(Date.now());
 
   const checkTypingSpeed = (value) => {
@@ -167,6 +360,13 @@ const App = () => {
     
     if (charsAdded > 0) {
       charCountRef.current += charsAdded;
+      totalCharsTypedRef.current += charsAdded;
+      
+      // Award XP for every 50 characters typed
+      if (totalCharsTypedRef.current >= 50) {
+          handleUpdateMastery('code_block_syntax', false);
+          totalCharsTypedRef.current = 0;
+      }
     }
 
     if (elapsed > 8) {
@@ -180,7 +380,7 @@ const App = () => {
     }
   };
 
-  const handleRequirementSubmit = (e) => {
+  const handleRequirementSubmit = async (e) => {
     e.preventDefault();
     if (!requirement.trim()) return;
     const pattern = matchRequirement(requirement);
@@ -190,6 +390,11 @@ const App = () => {
     }
     setErrors([]);
     setInputHistory([]);
+    
+    // Reset Socratic hint history for the new mission
+    const { resetHintState } = await import('./engines/HintEngine');
+    resetHintState();
+    
     setConsoleLogs([{ type: 'system', message: `Mission Deployed: ${pattern.title}` }]);
   };
 
@@ -210,7 +415,7 @@ const App = () => {
     }
   };
 
-  const handleEditorChange = (value) => {
+  const handleEditorChange = async (value) => {
     try {
         if (isPasting) return;
         checkTypingSpeed(value);
@@ -224,10 +429,36 @@ const App = () => {
 
         // Debounced Error Scanning
         const currentErrors = scanPythonCode(value);
+        
+        // Manual Fix Detection
+        if (currentErrors.length < prevErrorCount.current && currentErrors.length >= 0) {
+            // Student fixed something manually!
+            const Classification = await import('./engines/HintEngine');
+            const hint = Classification.generateLayeredHint({ message: "Manual fix detection", type: 'hint', line: 0 });
+            if (hint && hint.concept) {
+                handleUpdateMastery(hint.concept.id, false);
+            }
+        }
+        prevErrorCount.current = currentErrors.length;
+
         setErrors(currentErrors);
         updateMarkers(currentErrors);
 
-        // Auto-run logic (FIXED: run regardless of errors)
+        // Pattern Detection
+
+        // Pattern Detection
+        if (currentErrors.length > 0) {
+            const pattern = trackErrorPattern(currentErrors[0]);
+            if (pattern && pattern.mode === 'intensive') {
+                setIntensiveMode(pattern);
+            } else {
+                setIntensiveMode(null);
+            }
+        } else {
+            setIntensiveMode(null);
+        }
+
+        // Auto-run logic
         if (autoRun) {
             if (autoRunTimerRef.current) clearTimeout(autoRunTimerRef.current);
             autoRunTimerRef.current = setTimeout(() => {
@@ -237,6 +468,26 @@ const App = () => {
     } catch (e) {
         console.error("Editor change error:", e);
     }
+  };
+
+  const handleApplyFix = (error, layeredHint) => {
+      if (!layeredHint || !layeredHint.quickFix) return;
+      
+      const lines = code.split('\n');
+      const targetLineIdx = error.line - 1;
+      if (lines[targetLineIdx] !== undefined) {
+          lines[targetLineIdx] = layeredHint.quickFix(lines[targetLineIdx]);
+          const newCode = lines.join('\n');
+          setCode(newCode);
+          
+          // Update Mastery
+          if (layeredHint.concept) {
+              handleUpdateMastery(layeredHint.concept.id, true);
+              setErrorGenealogy(prev => [...prev, layeredHint.concept.id]);
+          }
+          
+          setConsoleLogs(prev => [...prev, { type: 'success', message: "Quick fix applied!" }]);
+      }
   };
 
   const insertBoilerplate = (type) => {
@@ -266,6 +517,9 @@ const App = () => {
     setIsExecuting(true);
     setConsoleLogs(prev => [...prev, { type: 'system', message: "Initializing Real Python Environment..." }]);
     
+    // Initial execution reward
+    handleUpdateMastery('variable_declaration', false);
+    
     try {
         console.log("[App] Running code:", code.substring(0, 50) + "...");
         // Dynamic parameter extraction from sample_input
@@ -292,32 +546,39 @@ const App = () => {
         
         if (result.success) {
             if (result.awaitingInput) {
+                setAwaitingInput(true);
                 setConsoleLogs(prev => {
-                    // Only add stdout if it's not empty and different from last
                     const newLogs = [...prev];
-                    if (result.stdout && (!prev.length || prev[prev.length-1].message !== result.stdout)) {
-                        newLogs.push({ type: 'system', message: result.stdout });
+                    if (result.stdout && !prev.some(l => l.message === result.stdout)) {
+                        newLogs.push({ type: 'stdout', message: result.stdout });
                     }
                     return newLogs;
                 });
                 setCurrentInputPrompt(result.prompt || "Input required:");
-                setIsInputModalOpen(true);
                 return;
             }
 
-            setConsoleLogs(prev => [...prev, { type: 'success', message: "Execution Successful." }]);
-            if (result.stdout) {
-                setConsoleLogs(prev => [...prev, { type: 'system', message: result.stdout }]);
-            }
-            if (result.returnValue !== undefined) {
-                setConsoleLogs(prev => [...prev, { type: 'system', message: `Return Value: ${result.returnValue}` }]);
-            }
+            setAwaitingInput(false);
+            setConsoleLogs(prev => {
+                const newLogs = [{ type: 'system', message: "Execution Successful." }];
+                if (result.stdout) {
+                    newLogs.push({ type: 'stdout', message: result.stdout });
+                }
+                if (result.returnValue !== undefined) {
+                    newLogs.push({ type: 'system', message: `Return Value: ${result.returnValue}` });
+                }
+                return newLogs;
+            });
 
-            // Logic Comparison (Only for template missions)
+            // Logic Comparison
             if (!activePattern.dynamic) {
                 const comparison = await compareLogic(code, activePattern, result.returnValue);
                 if (comparison.passed) {
                     setConsoleLogs(prev => [...prev, { type: 'success', message: comparison.message }]);
+                    
+                    // Award Mastery for successful completion
+                    handleUpdateMastery('code_block_syntax', false);
+
                     setRefactorOptions(getRefactorSuggestions(activePattern.id, code));
                     setShowRefactor(true);
                     triggerExplainMode();
@@ -326,6 +587,7 @@ const App = () => {
                 }
             } else {
                 setConsoleLogs(prev => [...prev, { type: 'success', message: "Mission results verified against your goal." }]);
+                handleUpdateMastery('code_block_syntax', false);
                 triggerExplainMode();
             }
         } else {
@@ -378,6 +640,16 @@ const App = () => {
     setTimeout(() => setIsPasting(false), 4000);
   };
 
+  // Helper to update mastery with notification
+  const handleUpdateMastery = (conceptId, isAuto) => {
+    const updated = updateMastery(conceptId, isAuto);
+    setMasteryData(updated);
+    
+    // Show toast notification
+    setMasteryNotice({ xp: isAuto ? 10 : 30, concept: conceptId });
+    setTimeout(() => setMasteryNotice(null), 3000);
+  };
+
   return (
     <div className="app-scroll-container">
       <div className="app-container">
@@ -400,6 +672,17 @@ const App = () => {
                 <p>Typing builds muscle memory. Type your logic manually.</p>
             </div>
         )}
+        {masteryNotice && (
+            <motion.div 
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -50, opacity: 0 }}
+                className="mastery-toast"
+            >
+                <Star size={20} fill="#FFD700" />
+                <span>+{masteryNotice.xp} XP: {masteryNotice.concept.replace(/_/g, ' ')}</span>
+            </motion.div>
+        )}
         {typingSpeedAlert && (
              <div className="overlay" style={{background: 'rgba(255,165,0,0.8)'}}>
                 <Flame size={64} color="white" />
@@ -412,16 +695,44 @@ const App = () => {
                 <Lightbulb size={64} color="var(--clr-hint)" />
                 <h2>Knowledge Verification</h2>
                 <p>Explain what this line does in your own words:</p>
-                <div style={{background: '#000', padding: 20, borderRadius: 8, margin: '20px 0', width: '100%', maxWidth: 500}}>
+                <div style={{background: '#000', padding: 20, borderRadius: 8, margin: '20px 0', width: '100%', maxWidth: 500, border: '1px solid var(--clr-success)'}}>
                     <code style={{color: 'var(--clr-success)'}}>{explainLine}</code>
                 </div>
+
+                <AnimatePresence>
+                    {verificationFeedback && (
+                        <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="verification-feedback-box"
+                        >
+                            <MessageSquare size={16} />
+                            <span>{verificationFeedback}</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 <textarea 
                     placeholder="Type your explanation here (min 15 chars)..."
                     value={explainAnswer}
-                    onChange={(e) => setExplainAnswer(e.target.value)}
+                    onChange={(e) => {
+                        setExplainAnswer(e.target.value);
+                        if (verificationFeedback) setVerificationFeedback("");
+                    }}
                     style={{maxWidth: 500}}
                 />
                 <button className="button-primary" style={{marginTop: 20}} onClick={handleExplainSubmit}>Verify & Complete</button>
+                <button 
+                    className="button-ghost" 
+                    style={{marginTop: 10, fontSize: '0.8rem'}}
+                    onClick={() => {
+                        setIsExplaining(false);
+                        setVerificationFeedback("");
+                    }}
+                >
+                    Maybe later
+                </button>
             </div>
         )}
         {mutationChallenge && (
@@ -442,37 +753,26 @@ const App = () => {
                 </div>
             </div>
         )}
-        {isInputModalOpen && (
-            <div className="overlay animate-pop">
-                <Terminal size={64} color="var(--clr-accent)" />
-                <h2>Program Input Required</h2>
-                <p>{currentInputPrompt}</p>
-                <form onSubmit={handleInputSubmit} style={{width: '100%', maxWidth: 400}}>
-                    <input 
-                        autoFocus
-                        type="text" 
-                        placeholder="Enter value..."
-                        value={tempInputValue}
-                        onChange={(e) => setTempInputValue(e.target.value)}
-                        className="input-field-premium"
-                    />
-                    <button type="submit" className="button-primary" style={{marginTop: 20, width: '100%'}}>
-                        Send to Program <Send size={16} />
-                    </button>
-                </form>
-            </div>
-        )}
+        {/* Removed redundant input overlay */}
       </AnimatePresence>
 
       <header className="app-header glass-panel">
         <div className="logo">
           <Flame className="logo-icon" size={24} />
-          <span>Logic Lens Compiler</span>
+          <span>Logic Lens <span style={{color: 'var(--accent)'}}>Pro</span></span>
         </div>
-        <div className="header-status">
-            <div className={`status-indicator ${pythonStatus === 'ready' ? 'online' : pythonStatus === 'error' ? 'offline' : 'checking'}`}>
-                <Play size={10} fill="currentColor" />
-                <span>PY ENGINE: {pythonStatus.toUpperCase()}</span>
+        <div className="engine-status-bar">
+            <div className={`status-badge ${pythonStatus === 'ready' ? 'ready' : 'error'}`}>
+                <Zap size={12} fill="currentColor" />
+                PY ENGINE: {pythonStatus.toUpperCase()}
+            </div>
+            <div className={`status-badge ${pyrightStatus === 'ready' ? 'ready' : 'offline'}`}>
+                <Zap size={12} fill="currentColor" />
+                PYRIGHT: {pyrightStatus.toUpperCase()}
+            </div>
+            <div className={`status-badge ${mentorStatus === 'online' ? 'ready' : 'offline'}`}>
+                <MessageSquare size={12} fill="currentColor" />
+                AI MENTOR: {mentorStatus.toUpperCase()}
             </div>
         </div>
       </header>
@@ -509,41 +809,54 @@ const App = () => {
               <Lightbulb size={18} />
               <h2>Socratic Guidance</h2>
             </div>
-            {errors.length > 0 ? (
-                <>
-                {errors.map((err, i) => (
-                    <div key={`err-${i}`} className="hint-item error">
-                        <AlertCircle size={16} />
-                        <span>Line {err.line}: {err.message}</span>
-                    </div>
-                ))}
-                <button 
-                    className="button-primary-sm" 
-                    style={{marginTop: 10, width: '100%', background: 'var(--clr-warning)', color: 'black'}}
-                    onClick={triggerMutationChallenge}
+            
+            {intensiveMode && (
+                <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="intensive-alert"
                 >
-                    <Zap size={14} /> Challenge Me: Fix 3 Variants
-                </button>
-                </>
+                    <Zap size={20} />
+                    <div>
+                        <strong>Intensive Mode Active</strong>
+                        <p>{intensiveMode.message}</p>
+                        <p className="tip">{intensiveMode.tip}</p>
+                    </div>
+                </motion.div>
+            )}
+
+            {errors.length > 0 ? (
+                <div className="error-stack">
+                    {errors.map((err, i) => {
+                        const layeredHint = generateLayeredHint(err);
+                        return (
+                            <EnhancedErrorCard 
+                                key={`err-${i}`}
+                                error={err}
+                                layeredHint={layeredHint}
+                                onApplyFix={handleApplyFix}
+                                onAskMentor={() => setMentorQuestion(`Can you help me understand why I'm getting this error on line ${err.line}?`)}
+                                onChallenge={triggerMutationChallenge}
+                            />
+                        );
+                    })}
+                </div>
             ) : (
                 <div className="hint-item success">
                     <CheckCircle size={16} />
                     <span>No structural issues detected. Ready to execute.</span>
                 </div>
             )}
+
+            <MasteryTracker data={masteryData} />
+
             {mentorChat.slice(-1).map((msg) => (
-                <div key={msg.id} className="hint-item" style={{borderColor: 'var(--clr-hint)'}}>
+                <div key={msg.id} className="hint-item" style={{borderColor: 'var(--clr-hint)', marginTop: 15}}>
                     <MessageSquare size={16} />
                     <div>
                         <strong style={{display: 'block', fontSize: '0.7rem'}}>MENTOR RESPONSE:</strong>
                         {msg.a}
                     </div>
-                </div>
-            ))}
-            {safetyWarnings.map((w, i) => (
-                <div key={`safe-${i}`} className="hint-item" style={{borderColor: 'var(--clr-warning)', background: 'rgba(255,165,0,0.1)'}}>
-                    <ShieldCheck size={16} color="var(--clr-warning)" />
-                    <span style={{color: 'var(--clr-warning)'}}>{w.message}</span>
                 </div>
             ))}
           </section>
@@ -558,68 +871,10 @@ const App = () => {
             value={code}
             onChange={handleEditorChange}
             onMount={(editor, monaco) => {
-              editorRef.current = editor;
-              window.monaco = monaco;
-
-              // Logic Spark: Completion Provider
-              monaco.languages.registerCompletionItemProvider('python', {
-                provideCompletionItems: (model, position) => {
-                    const word = model.getWordUntilPosition(position);
-                    const range = {
-                        startLineNumber: position.lineNumber,
-                        endLineNumber: position.lineNumber,
-                        startColumn: word.startColumn,
-                        endColumn: word.endColumn
-                    };
-                    const suggestions = [
-                        {
-                            label: 'def',
-                            kind: monaco.languages.CompletionItemKind.Snippet,
-                            insertText: 'def ${1:function_name}(${2:params}):\n    ${3:# logic here}\n    pass',
-                            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                            documentation: 'Function structure',
-                            range: range
-                        },
-                        {
-                            label: 'for',
-                            kind: monaco.languages.CompletionItemKind.Snippet,
-                            insertText: 'for ${1:item} in ${2:iterable}:\n    ${3:pass}',
-                            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                            documentation: 'For loop pattern',
-                            range: range
-                        },
-                        {
-                            label: 'if',
-                            kind: monaco.languages.CompletionItemKind.Snippet,
-                            insertText: 'if ${1:condition}:\n    ${2:pass}',
-                            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                            documentation: 'If condition',
-                            range: range
-                        },
-                        {
-                            label: 'while',
-                            kind: monaco.languages.CompletionItemKind.Snippet,
-                            insertText: 'while ${1:condition}:\n    ${2:pass}',
-                            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                            documentation: 'While loop',
-                            range: range
-                        },
-                        {
-                            label: 'try',
-                            kind: monaco.languages.CompletionItemKind.Snippet,
-                            insertText: 'try:\n    ${1:pass}\nexcept ${2:Exception} as e:\n    ${3:pass}',
-                            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                            documentation: 'Try/Except block',
-                            range: range
-                        }
-                    ];
-                    return { suggestions: suggestions };
-                }
-              });
-
-              // Intercept paste at the DOM level
-              const container = editor.getContainerDomNode();
-              container.addEventListener('paste', onPaste, true);
+                window.monaco = monaco;
+                handleEditorMount(editor, monaco);
+                const container = editor.getContainerDomNode();
+                container.addEventListener('paste', onPaste, true);
             }}
             options={{
               fontSize: 16,
@@ -629,9 +884,26 @@ const App = () => {
               cursorBlinking: 'smooth',
               cursorSmoothCaretAnimation: "on",
               lineNumbersMinChars: 3,
-              fontFamily: "'Fira Code', 'Courier New', monospace",
+              fontFamily: "var(--font-mono)",
+              glyphMargin: true,
+              lightbulb: { enabled: true }
             }}
           />
+          {quickFixes.length > 0 && (
+              <div className="suggestion-chips">
+                  {quickFixes.map((fix, i) => (
+                      <div key={i} className="suggestion-chip" onClick={() => {
+                          if (fix.action === 'fix_eq') {
+                              setCode(code.replace('=', '=='));
+                          } else {
+                              setMentorQuestion(`How do I ${fix.label.toLowerCase()}?`);
+                          }
+                      }}>
+                          <Sparkles size={14} /> {fix.label}
+                      </div>
+                  ))}
+              </div>
+          )}
           <div className="editor-controls">
             <div className="auto-run-toggle">
               <input 
@@ -658,13 +930,35 @@ const App = () => {
             <div className="section-header">
               <Terminal size={18} />
               <h2>Logic Console</h2>
+              <div className="console-header-actions">
+                <button className="console-clear-btn" onClick={handleClearConsole}>
+                   × Clear
+                </button>
+              </div>
             </div>
             <div className="console-area">
                 {consoleLogs.map((log, i) => (
-                    <div key={`log-${i}`} style={{color: log.type === 'error' ? 'var(--clr-err-syntax)' : log.type === 'success' ? 'var(--clr-success)' : 'var(--text-main)', marginBottom: 5}}>
+                    <div key={`log-${i}`} className={`console-line console-msg-${log.type}`}>
+                        <span className="console-timestamp">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
                         {log.type === 'system' ? '> ' : ''}{log.message}
                     </div>
                 ))}
+                
+                {awaitingInput && (
+                    <div className="console-input-line">
+                        <span className="console-input-prompt">{currentInputPrompt || ">"}</span>
+                        <form onSubmit={handleInputSubmit} style={{flex: 1, display: 'flex'}}>
+                            <input 
+                                autoFocus
+                                type="text"
+                                className="console-input-field"
+                                value={tempInputValue}
+                                onChange={(e) => setTempInputValue(e.target.value)}
+                                placeholder="Type input and press Enter..."
+                            />
+                        </form>
+                    </div>
+                )}
                 {refactorOptions.length > 0 && (
                     <div className="refactor-panel-container">
                         {!showRefactor ? (

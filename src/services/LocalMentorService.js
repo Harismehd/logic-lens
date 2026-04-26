@@ -2,22 +2,10 @@
  * Logic Lens Mentor Service
  * Powered by Google Gemini Pro
  */
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Use import.meta.env for Vite frontend compatibility
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-let genAI = null;
-let model = null;
-
-if (API_KEY) {
-    try {
-        genAI = new GoogleGenerativeAI(API_KEY);
-        model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    } catch (e) {
-        console.error("[MentorService] Initialization failed:", e);
-    }
-}
+// Groq API implementation
+const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+const MODEL_NAME = "llama-3.3-70b-versatile"; 
+const API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const OFFLINE_EXPLANATIONS = {
     'indentation': "Python uses indentation to group code. Ensure all lines in a block have 4 spaces.",
@@ -29,35 +17,36 @@ const OFFLINE_EXPLANATIONS = {
 /**
  * Check if Gemini is configured and accessible
  */
-export const checkMentorStatus = async () => {
-    if (!API_KEY) {
-        console.warn("[MentorService] VITE_GEMINI_API_KEY is missing.");
-        return false;
-    }
-    // Simple verification call to check API validity
-    try {
-        return !!model;
-    } catch (e) {
-        return false;
-    }
-};
-
-/**
- * Generic caller for Gemini API
- */
 export const callGemini = async (prompt) => {
-    if (!model) return null;
+    if (!API_KEY) return null;
 
     try {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return response.text();
-    } catch (e) {
-        if (e.message?.includes("429") || e.message?.includes("Too Many Requests")) {
-            console.error("[MentorService] Rate limit exceeded. Please wait a moment.");
-            return "ERROR_RATE_LIMIT";
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${API_KEY}`
+            },
+            body: JSON.stringify({
+                model: MODEL_NAME,
+                messages: [
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error("[MentorService] Groq API Error:", JSON.stringify(errorData, null, 2));
+            if (response.status === 429) return "ERROR_RATE_LIMIT";
+            return null;
         }
-        console.error("[MentorService] API Error:", e.message);
+
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (e) {
+        console.error("[MentorService] Network Error:", e);
         return null;
     }
 };
@@ -134,31 +123,34 @@ export const verifyExplanation = async (codeLine, studentExplanation) => {
     INSTRUCTIONS:
     - If accurate, return isCorrect: true.
     - If vague or incorrect, return isCorrect: false.
-    - Feedback should be one clear, encouraging sentence.
-    - If correct, confirm their logic (e.g., "Spot on! You've correctly identified that this line concatenates strings.").
-    - If incorrect, ask a Socratic question to guide them (e.g., "Think about what happens to the result of the addition. Where is it stored?").
+    - Provide a pedagogical score from 0 to 100 based on accuracy and depth.
+    - Feedback should be constructive and encouraging.
+    - If correct, explain WHY it's correct (e.g., "Spot on! You've correctly identified that this line concatenates strings.").
+    - If incorrect, ask a Socratic question to guide them.
     
-    Respond ONLY in JSON format:
-    { "isCorrect": boolean, "feedback": "string" }
+    Respond STRICTLY in JSON format:
+    { "isCorrect": boolean, "score": number, "feedback": "string" }
     `;
 
     const response = await callGemini(prompt);
     
     if (response === "ERROR_RATE_LIMIT") {
-        return { isCorrect: true, feedback: "You're moving fast! I'm hitting a rate limit, but your explanation looks good enough for now. Keep going!" };
+        return { isCorrect: true, score: 85, feedback: "You're moving fast! I'm hitting a rate limit, but your explanation looks good enough for now. Keep going!" };
     }
 
     try {
         const jsonMatch = response.match(/\{.*\}/s);
         const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : response);
         return {
-            isCorrect: !!parsed.isCorrect,
+            isCorrect: parsed.score >= 70,
+            score: parsed.score || 0,
             feedback: parsed.feedback || (parsed.isCorrect ? "Correct! Great job." : "Not quite. Can you elaborate?")
         };
     } catch (e) {
         const isLongEnough = studentExplanation.length > 20;
         return { 
             isCorrect: isLongEnough, 
+            score: isLongEnough ? 75 : 40,
             feedback: isLongEnough 
                 ? "Excellent explanation. You've clearly understood how this logic functions."
                 : "I'd like a bit more detail. What exactly is this line doing with the data?"
@@ -183,5 +175,8 @@ const getOfflineResponse = (code, query, errors, activePattern) => {
 };
 
 // Backward Compatibility Aliases
+export const checkMentorStatus = async () => {
+    return !!API_KEY;
+};
 export const checkOllamaStatus = checkMentorStatus;
 export const callOllama = callGemini;

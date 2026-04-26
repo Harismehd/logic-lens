@@ -1,7 +1,4 @@
-/**
- * Logic Lens Real Python Compiler (via Pyodide)
- * 100% Real Python in Browser
- */
+import { instrumentCodeForSafety } from '../engines/SafetyEngine';
 
 let pyodideInstance = null;
 let pyodidePromise = null;
@@ -33,6 +30,12 @@ export const loadPyodide = async () => {
                 indexURL: "/pyodide/"
             });
             
+            // Set safety limits
+            await pyodide.runPythonAsync(`
+import sys
+sys.setrecursionlimit(500) # Prevents browser-crashing stack overflows
+`);
+
             console.log("[Pyodide] Instance ready.");
             pyodideInstance = pyodide;
             return pyodide;
@@ -80,8 +83,11 @@ builtins.input = custom_input
 `);
 
     try {
+        // Instrument code for safety (Infinite loop protection)
+        const safeCode = instrumentCodeForSafety(code);
+        
         // Execute the user code
-        await pyodide.runPythonAsync(code);
+        await pyodide.runPythonAsync(safeCode);
 
         // If it's a function mission, find the function and call it
         const funcNameMatch = code.match(/def\s+(\w+)\(/);
@@ -112,6 +118,24 @@ builtins.input = custom_input
                 awaitingInput: true,
                 prompt: prompt,
                 stdout: stdout.trim()
+            };
+        }
+
+        // Handle Safety Timeout
+        if (e.message.includes("SAFETY_ERROR:")) {
+            return {
+                success: false,
+                stdout: stdout.trim(),
+                error: { message: "CRITICAL: Infinite loop detected and terminated to save your browser! Check your loop conditions." }
+            };
+        }
+
+        // Handle Recursion Error
+        if (e.message.includes("recursion depth exceeded")) {
+            return {
+                success: false,
+                stdout: stdout.trim(),
+                error: { message: "CRITICAL: Recursion Bomb detected! (Stack Overflow). Ensure your recursive function has a base case." }
             };
         }
 
