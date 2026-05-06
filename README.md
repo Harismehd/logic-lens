@@ -1,119 +1,95 @@
-# 🧠 Logic Lens Pro
-## The Anti-Vibe-Coding IDE for Serious Learners
+<div align="center">
+  <img src="./public/favicon.svg" alt="Logic Lens Logo" width="120" />
+  <h1>🧠 Logic Lens</h1>
+  <p><strong>The Anti-Vibe-Coding IDE for Serious Learners</strong></p>
 
-[![Python](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/)
-[![React](https://img.shields.io/badge/React-19.0-blue?style=flat-square&logo=react)](https://react.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=flat-square)]()
-[![Maintained](https://img.shields.io/badge/Maintained%3F-Yes-green?style=flat-square)]()
-
-**Stop vibe coding. Start understanding programming.**
-
-Logic Lens Pro is a pedagogically-designed IDE that forces genuine learning by detecting when you're copying, verifying your understanding, and guiding you through Socratic questioning.
-
----
-
-## ⚡ What You Get
-
-**In 30 seconds:**
-1. Write Python code in a professional IDE
-2. Real-time error detection + intelligent hints
-3. Run code instantly (no setup needed)
-4. System asks you to explain your code
-5. AI mentor helps you understand concepts
-6. You actually *learn*, not just copy-paste
-
-*That's it. No fluff. Just learning.*
+  <p>
+    <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19.0-blue?style=for-the-badge&logo=react" alt="React" /></a>
+    <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python" alt="Python" /></a>
+    <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-ML_Backend-009688?style=for-the-badge&logo=fastapi" alt="FastAPI" /></a>
+    <img src="https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=for-the-badge" alt="Status" />
+  </p>
+  <p>
+    <em>Stop vibe coding. Start understanding programming.</em>
+  </p>
+</div>
 
 ---
 
-## 🎯 Core Features
+## ⚡ What is Logic Lens?
 
-### 🔴 Real-Time Intelligence
-- **Professional-grade error detection**: Catch syntax and logic issues instantly.
-- **Context-aware suggestions**: Get hints that actually apply to your specific code structure.
-- **Intelligent Auto-complete**: Speed up development with IDE-level completions.
-- **Function Signature Hints**: Never guess a parameter type again.
+**Logic Lens** is a state-of-the-art, pedagogically designed Python IDE built to enforce genuine learning. Unlike traditional IDEs or modern AI assistants that simply give you the correct code, Logic Lens detects when you're struggling, identifies the exact nature of your misconception, and guides you through Socratic questioning so you discover the solution yourself.
 
-### 🎓 Pedagogical Enforcement
-- **Understanding Verification Gate**
-  - You must explain your code to pass the mission.
-  - System scores your explanation (0-100%) to prevent "fake" completions.
-- **Error Mutation Challenges**
-  - Generates 3 variants of the same error type.
-  - You must fix all 3 to master the concept, ensuring deep learning.
-- **Socratic Guidance System**
-  - AI asks questions, never gives answers.
-  - Concept-linked learning paths tailored to your struggle patterns.
+It combines **sub-50ms local structural analysis** with a **precision Machine Learning backend (Cognis)** to provide keystroke-level, context-aware mentoring.
 
-### 🛡️ Anti-Vibe-Coding Detection
-- **Paste Blocking**: Disables the ability to copy-paste code to build muscle memory.
-- **Tab-Switch Detection**: Monitors when you leave the environment to search for answers.
-- **Mission-Goal Validation**: Automatically verifies if your logic actually solves the problem.
-- **Intensity Monitoring**: Detects when you're struggling and triggers intensive guidance.
-
-### 🚀 Professional IDE Experience
-- **Monaco Editor**: Powered by the same engine as VS Code.
-- **Professional Dark Theme**: Designed for long, focused study sessions.
-- **Responsive Layout**: Optimized for desktop and tablet learning environments.
+*No fluff. Just learning.*
 
 ---
 
-## 🎨 What Makes Logic Lens Different
+## 🎯 Unmatched Features
 
-| Feature | Logic Lens | VS Code | Replit | ChatGPT |
-|---------|-----------|--------|--------|---------|
-| Real-Time Error Detection | ✅ Yes | ✅ Yes | ❌ No | ❌ No |
-| Understanding Verification | ✅ **YES** | ❌ No | ❌ No | ❌ No |
-| Error Mutations | ✅ **YES** | ❌ No | ❌ No | ❌ No |
-| Anti-Vibe-Coding | ✅ **YES** | ❌ No | ❌ No | ❌ No |
-| Socratic Guidance | ✅ **YES** | ❌ No | ✅ Some | ✅ Basic |
-| No API Dependency (Local) | ✅ **YES** | ✅ Yes | ❌ No | ❌ No |
-| Free to Use | ✅ **YES** | ✅ Yes | ⚠️ Limited | ❌ No |
+### 🔴 Real-Time Socratic Tooltips (Cognis AI)
+- **Keystroke-Level Diagnosis**: A two-pass system analyzes your code instantly (50ms local scan + 150ms AI check) and classifies errors into 20 distinct conceptual categories.
+- **Socratic Pedagogy**: Instead of generic `SyntaxError` messages or giving you the answer, a floating glassmorphism tooltip asks targeted questions (e.g., *"What is the difference between `=` and `==` in Python?"*).
+- **Expandable Context**: Click the tooltip to reveal the root cause, leading questions, and the next best action.
 
-**The difference:** Other tools help you code. Logic Lens makes you *understand* code.
+### 🎓 Deep Pedagogical Enforcement
+- **5-Level Hint Hierarchy**: Hints escalate from gentle observations to full explanations automatically based on your struggle patterns.
+- **Intensive Mode**: If you make the same conceptual error 3+ times in a minute, the system adapts, penalizes your mastery score, and provides more direct intervention.
+- **Understanding Verification**: Fix an error? The system may ask you to explain *why* you changed what you did before letting you move on.
+
+### 🛡️ Anti-Vibe-Coding Telemetry
+- **Behavioral Monitoring**: Tracks copy-pasting large blocks of code, excessive tab switching, and abnormal typing speeds to detect academic dishonesty or over-reliance on external AI tools.
+- **Self-Learning AI Loop**: Every time you fix, ignore, or dismiss a hint, the outcome is logged. The Cognis model continuously learns which Socratic strategies actually help students learn.
+- **Frustration Context**: The AI knows if you've been stuck for 20 minutes and adjust its mentoring tone accordingly.
+
+### 🚀 Autonomous "Lens Agent"
+- **Visual Demonstrations**: For deterministic errors, activate the **Lens Agent** to watch the IDE autonomously take control, highlight the faulty line, and type the correction character-by-character—simulating human typing.
+
+### 💻 Professional, In-Browser IDE Experience
+- **Zero Server Execution**: Python runs entirely inside your browser via Pyodide (WASM). Your code never leaves your machine. Fast, secure, and offline-capable.
+- **Multi-File Projects**: Manage complete projects with a VSCode-style file explorer.
+- **Concept Mastery Dashboard**: Track your proficiency across 8 core Python concepts with XP, levels, and badges.
 
 ---
 
-## 📊 By The Numbers
+## 🎨 Why Logic Lens is Different
 
-- **~3,000+** lines of custom pedagogical code
-- **6** error detection systems working in parallel
-- **5** levels of Socratic hints (contextual)
-- **100%** local execution (no cloud dependency)
-- **<300ms** real-time analysis latency
-- **Supports** 50+ Python error types with intelligent categorization
-- **24/7** offline-capable (built-in fallback mode)
-- **AI-Enhanced** with high-speed inference integration (Groq/Llama 3.3)
+| Feature | Logic Lens | VS Code | Replit | Standard AI Tools |
+|---------|:---:|:---:|:---:|:---:|
+| **Keystroke Socratic Mentoring** | ✅ **YES** | ❌ No | ❌ No | ❌ No |
+| **Concept-Specific ML Diagnosis** | ✅ **YES** | ❌ No | ❌ No | ❌ No |
+| **Auto-Fixing Visual Agent** | ✅ **YES** | ❌ No | ❌ No | ❌ No |
+| **Anti-Vibe-Coding Detection** | ✅ **YES** | ❌ No | ❌ No | ❌ No |
+| **In-Browser Execution (WASM)** | ✅ **YES** | ❌ No | ❌ No | ❌ No |
+| **Self-Learning Hint Effectiveness** | ✅ **YES** | ❌ No | ❌ No | ❌ No |
+
+**The Philosophy:** Other tools help you write code faster. Logic Lens ensures you actually *understand* what you are writing.
 
 ---
 
 ## 🛠️ Technology Stack
 
-**Frontend:**
-- **React 19**: Modern, responsive UI framework.
-- **Monaco Editor**: Professional-grade code editing environment.
-- **Framer Motion**: Smooth, interactive micro-animations.
+**Frontend IDE (React 19 / Vite):**
+- **Monaco Editor**: Professional-grade editing surface.
+- **Framer Motion**: Smooth micro-animations for tooltips and the Lens Agent.
+- **Web Tree-sitter**: Instant, WASM-based structural AST parsing.
+- **Pyodide**: Full CPython 3.12 execution in the browser.
 
-**Engine Architecture:**
-- **Pyright**: Professional Python static analysis.
-- **Pyodide**: Full Python 3.12 execution in the browser via WebAssembly.
-- **Custom Socratic Engine**: Proprietary logic for understanding verification.
-
-**Intelligence Layer:**
-- **Groq API**: Ultra-fast LLM inference for Socratic mentoring.
-- **Llama 3.3**: Advanced pedagogical reasoning models.
+**Cognis ML Backend (FastAPI):**
+- **HistGradientBoosting**: A highly calibrated ensemble model trained on 80,000+ synthetic examples to classify 20 specific Python misconceptions at sub-50ms latency.
+- **Grok / Gemini API**: Powers the free-form Socratic mentor chat panel.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Development)
 
 ### Prerequisites
 - Node.js 18+
+- Python 3.10+ (for the Cognis ML backend)
 - npm or yarn
 
-### Installation
-
+### 1. Start the Frontend
 ```bash
 # Clone the repository
 git clone https://github.com/Harismehd/logic-lens.git
@@ -122,38 +98,46 @@ cd logic-lens
 # Install dependencies
 npm install
 
-# Start the development server
+# Start the Vite development server
 npm run dev
 ```
 
-### First Run
+### 2. Start the Cognis Backend (Required for ML Diagnostics)
+*Note: The FastAPI backend must be running for the AI tooltips and telemetry features to function. Without it, Logic Lens falls back to local Tree-sitter diagnostics.*
+```bash
+# Navigate to the ML backend directory (assuming it's cloned)
+cd path/to/cognis-backend
+
+# Install Python requirements
+pip install -r requirements.txt
+
+# Start the FastAPI server (runs on localhost:8000)
+uvicorn app:app --reload
+```
+
+### 3. Start Coding
 1. Open `http://localhost:5173`.
-2. Type Python code in the editor.
-3. Click **"Execute Logic"**.
-4. Complete the **Knowledge Verification** to finish your mission.
+2. Type Python code in the editor (try leaving off a colon or using `=` instead of `==` in an `if` statement).
+3. Experience real-time Socratic mentoring!
 
 ---
 
-## 👨‍🎓 For Course Instructors
+## 👨‍🎓 For Educators & Bootcamps
 
-Logic Lens Pro is designed for Computer Science students and bootcamps to ensure genuine skill acquisition.
-
-### Educational Benefits
-✅ **Prevents "Vibe Coding"**: Forces students to type and think, not just copy.
-✅ **Verifies Mastery**: The verification gate ensures they actually understand the lines they wrote.
-✅ **FERPA-Compliant**: All execution happens locally; student code doesn't live on our servers.
-✅ **Portfolio-Grade**: An impressive demonstration of educational technology.
+Logic Lens Pro is designed specifically for Computer Science education:
+- **Ensures Genuine Skill Acquisition**: Forces students to think through problems rather than relying on LLMs to write code for them.
+- **Deep Analytics**: The Admin Dashboard provides granular insights into student performance, struggle patterns, and behavioral anomalies (like excessive pasting).
+- **FERPA-Compliant Execution**: All code execution happens locally in the browser.
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap & Phase Updates
 
-- [x] Real-time error detection & Socratic hints
-- [x] Understanding verification gates
-- [x] Multi-variant error mutation challenges
-- [ ] **Phase 2**: Interactive step-through logic debugger
-- [ ] **Phase 2**: Skill roadmap visualization
-- [ ] **Phase 3**: Classroom Dashboard for instructors
+- [x] **Phase 1**: Real-time error detection & Socratic hints
+- [x] **Phase 1.5**: Cognis ML integration (20 error types) & Self-Learning Telemetry
+- [x] **Phase 2**: Autonomous "Lens Agent" visual fixer
+- [x] **Phase 2.5**: Full Mastery Tracking, Anti-Vibe Detection, & Student Dashboards
+- [ ] **Phase 3**: Multi-language support (JavaScript, C++)
 
 ---
 
@@ -161,8 +145,10 @@ Logic Lens Pro is designed for Computer Science students and bootcamps to ensure
 
 MIT License - Free to use for education and research.
 
-## 🙏 Credits
+---
 
-Built with **Pyright**, **Monaco Editor**, and **Pyodide**. 
+<div align="center">
+  <p><strong>Logic Lens</strong> — <em>Built for the next generation of software engineers.</em></p>
+</div>ght**, **Monaco Editor**, and **Pyodide**. 
 
 **Logic Lens Pro** — *Built for the next generation of software engineers.*
