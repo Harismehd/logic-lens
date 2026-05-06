@@ -1,6 +1,8 @@
 <div align="center">
-  <img src="./public/favicon.svg" alt="Logic Lens Logo" width="120" />
-  <h1>🧠 Logic Lens</h1>
+ <h1 style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-weight: 800; background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px;">
+  🧠 Logic Lens by haris
+</h1>
+
   <p><strong>The Anti-Vibe-Coding IDE for Serious Learners</strong></p>
 
   <p>
@@ -82,45 +84,9 @@ It combines **sub-50ms local structural analysis** with a **precision Machine Le
 
 ---
 
-## 🚀 Quick Start (Development)
+## 🚀 Quick Start (Availble soon)
 
-### Prerequisites
-- Node.js 18+
-- Python 3.10+ (for the Cognis ML backend)
-- npm or yarn
 
-### 1. Start the Frontend
-```bash
-# Clone the repository
-git clone https://github.com/Harismehd/logic-lens.git
-cd logic-lens
-
-# Install dependencies
-npm install
-
-# Start the Vite development server
-npm run dev
-```
-
-### 2. Start the Cognis Backend (Required for ML Diagnostics)
-*Note: The FastAPI backend must be running for the AI tooltips and telemetry features to function. Without it, Logic Lens falls back to local Tree-sitter diagnostics.*
-```bash
-# Navigate to the ML backend directory (assuming it's cloned)
-cd path/to/cognis-backend
-
-# Install Python requirements
-pip install -r requirements.txt
-
-# Start the FastAPI server (runs on localhost:8000)
-uvicorn app:app --reload
-```
-
-### 3. Start Coding
-1. Open `http://localhost:5173`.
-2. Type Python code in the editor (try leaving off a colon or using `=` instead of `==` in an `if` statement).
-3. Experience real-time Socratic mentoring!
-
----
 
 ## 👨‍🎓 For Educators & Bootcamps
 
