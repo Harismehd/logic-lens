@@ -84,7 +84,7 @@ It combines **sub-50ms local structural analysis** with a **precision Machine Le
 
 ---
 
-## 🚀 Quick Start (Availble soon)
+## 🚀 Quick Start (Available soon)
 
 
 
